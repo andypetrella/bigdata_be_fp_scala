@@ -1,5 +1,4 @@
 import scala.concurrent._
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Random.{nextInt, nextBoolean}
 import Implicits._
 
@@ -68,8 +67,8 @@ object ExampleBagging extends App {
 
   val data = SimpleData(y, x)
 
-  List(1, 10, 100) foreach { n =>
+  List(10, 1, 2).zipWithIndex foreach { case (n, i) =>
     val coefs1 = Bagging(ModelLM)(mean, n)(data)
-    coefs1 onSuccess { case x => println(x) }
+    coefs1 onSuccess { case x => println(s"[${new java.util.Date()}] computation $i with $n samples gave: $x") }
   }
 }

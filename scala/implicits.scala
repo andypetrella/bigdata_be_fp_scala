@@ -1,4 +1,11 @@
+import java.util.concurrent.Executors
+import concurrent.ExecutionContext
+
 object Implicits {
+  val executorService = Executors.newFixedThreadPool(100)
+  implicit val executionContext = ExecutionContext.fromExecutorService(executorService)
+
+
   implicit class Vectorized(xs:List[Double]) {
     private[this] def cb(other:List[Double])(at:(Double,Double)=>Double):List[Double] = (xs zip other) map at.tupled
     private[this] def cb(scalar:Double)(at:(Double,Double)=>Double):List[Double] = xs map { at(_, scalar) }
