@@ -6,12 +6,12 @@ import Implicits._
 trait Data {
   def dependent:List[Double]
   def observed:Matrix
-  def sampling(proportion:Double):Future[Data]
+  def bootstrap(proportion:Double):Future[Data]
 }
 case class SimpleData(dependent:List[Double], variable:List[Double]) extends Data {
   override val observed = Matrix(variable, 1)
 
-  def sampling(proportion:Double) = future {
+  def bootstrap(proportion:Double) = future {
     val n = (dependent.size*proportion).toInt
     val indices = List.fill(n)(nextInt(dependent.size))
     val dep = indices map dependent
@@ -21,11 +21,17 @@ case class SimpleData(dependent:List[Double], variable:List[Double]) extends Dat
 }
 trait Model {
   type Coefs
-  def apply(data:Data):Future[Coefs]
+  def apply(data:Data):Future[(Coefs, List[Double]/*row*/=>Future[Double])]
 }
 object ModelLM extends LM with Model {
   type Coefs = (Double, Double)
-  def apply(data:Data) = future { apply(data.observed.t.rows.head, data.dependent) }
+  def apply(data:Data) = future {
+    val (coefs, f) = apply(data.observed.t.rows.head, data.dependent)
+    val predict = (row:List[Double]) => future {
+      f(row.head)
+    }
+    (coefs, predict)
+  }
 }
 
 trait Aggregation[A] extends (List[A]=>A)
@@ -33,8 +39,8 @@ trait Aggregation[A] extends (List[A]=>A)
 object Bagging {
   def apply(model:Model)(agg:Aggregation[model.Coefs], n:Int)(data:Data):Future[model.Coefs] = {
     def exec:Future[model.Coefs] =  for {
-                                      sample <- data.sampling(0.6)
-                                      coefs <- model(sample)
+                                      sample     <- data.bootstrap(0.6)
+                                      (coefs, _) <- model(sample)
                                     } yield coefs
     val execs:List[Future[model.Coefs]] = List.fill(n)(exec)
     val coefsList:Future[List[model.Coefs]] = Future.sequence(execs)
